@@ -1,3 +1,7 @@
+向刘焕勇老师致敬
+https://github.com/liuhuanyong/QASystemOnMedicalKG
+
+
 运行流程
 先执行 uv run python create_graph.py 
 
