@@ -18,6 +18,17 @@ class Relationship:
         self.type = type
         self.properties = properties
 
+class QueryCondition:
+    """
+    统一的查询条件数据结构
+    消除特殊情况，让所有查询都使用相同的接口
+    """
+    def __init__(self, label=None, properties=None, relationship_type=None, direction="outgoing"):
+        self.label = label
+        self.properties = properties or {}
+        self.relationship_type = relationship_type
+        self.direction = direction  # "outgoing", "incoming", "both"
+
 
 class Neo4jUtils:
     """
@@ -424,25 +435,139 @@ class Neo4jUtils:
             error(f"查找关系失败: {str(e)}")
             return {'success': False, 'error': str(e)}
     
-    def find_node_by_relationship(self, relationship_type, front_node_name):
+    def find_nodes_by_condition(self, source_condition, relationship_condition=None, target_condition=None):
         """
-        根据关系类型和属性查找节点
+        统一的节点查询方法 - 消除所有特殊情况
+        
+        Args:
+            source_condition: QueryCondition - 源节点查询条件
+            relationship_condition: QueryCondition - 关系查询条件
+            target_condition: QueryCondition - 目标节点查询条件（可选）
+        
+        Returns:
+            dict: {'success': bool, 'nodes': list, 'relationships': list}
         """
         try:
             with self.driver.session(database=self.database) as session:
-                query = "MATCH (a)-[r:$relationship_type]->(b) WHERE a.name = $front_node_name RETURN b"
-                result = session.run(query, relationship_type=relationship_type, front_node_name=front_node_name)
+                # 构建源节点匹配条件
+                source_label = f":{source_condition.label}" if source_condition.label else ""
+                source_props = self._build_property_conditions(source_condition.properties, "a")
+                
+                # 构建关系匹配条件
+                if relationship_condition and relationship_condition.relationship_type:
+                    rel_type = f":{relationship_condition.relationship_type}"
+                    rel_props = self._build_property_conditions(relationship_condition.properties, "r")
+                    
+                    # 根据方向构建查询
+                    if relationship_condition.direction == "outgoing":
+                        relationship_pattern = f"-[r{rel_type}]->"
+                    elif relationship_condition.direction == "incoming":
+                        relationship_pattern = f"<-[r{rel_type}]-"
+                    else:  # both
+                        relationship_pattern = f"-[r{rel_type}]-"
+                else:
+                    relationship_pattern = "-[r]->"
+                    rel_props = ""
+                
+                # 构建目标节点匹配条件
+                if target_condition:
+                    target_label = f":{target_condition.label}" if target_condition.label else ""
+                    target_props = self._build_property_conditions(target_condition.properties, "b")
+                    target_pattern = f"(b{target_label})"
+                    return_target = "RETURN a, r, b"
+                else:
+                    target_pattern = "(b)"
+                    target_props = ""
+                    return_target = "RETURN a, r, b"
+                
+                # 构建完整查询
+                where_conditions = []
+                if source_props:
+                    where_conditions.append(source_props)
+                if rel_props:
+                    where_conditions.append(rel_props)
+                if target_props:
+                    where_conditions.append(target_props)
+                
+                where_clause = " WHERE " + " AND ".join(where_conditions) if where_conditions else ""
+                
+                query = f"MATCH (a{source_label}){relationship_pattern}{target_pattern}{where_clause} {return_target}"
+                
+                # 构建参数字典
+                params = {}
+                for key, value in source_condition.properties.items():
+                    params[f"a_{key}"] = value
+                if relationship_condition and relationship_condition.properties:
+                    for key, value in relationship_condition.properties.items():
+                        params[f"r_{key}"] = value
+                if target_condition and target_condition.properties:
+                    for key, value in target_condition.properties.items():
+                        params[f"b_{key}"] = value
+                
+                result = session.run(query, params)
                 nodes = []
+                relationships = []
+                
                 for record in result:
-                    nodes.append(Node(
-                        id=record['b'].id,
-                        labels=list(record['b'].labels),
-                        properties=dict(record['b'])
-                    ))
-                return {'success': True, 'nodes': nodes}
+                    # 添加源节点
+                    if record['a']:
+                        nodes.append(Node(
+                            id=record['a'].id,
+                            labels=list(record['a'].labels),
+                            properties=dict(record['a'])
+                        ))
+                    
+                    # 添加关系
+                    if record['r']:
+                        relationships.append(Relationship(
+                            id=record['r'].id,
+                            type=record['r'].type,
+                            properties=dict(record['r'])
+                        ))
+                    
+                    # 添加目标节点
+                    if record['b']:
+                        nodes.append(Node(
+                            id=record['b'].id,
+                            labels=list(record['b'].labels),
+                            properties=dict(record['b'])
+                        ))
+                
+                return {'success': True, 'nodes': nodes, 'relationships': relationships}
+                
         except Exception as e:
-            error(f"查找节点失败: {str(e)}")
+            error(f"查询节点失败: {str(e)}")
             return {'success': False, 'error': str(e)}
+    
+    def _build_property_conditions(self, properties, alias):
+        """构建属性匹配条件"""
+        if not properties:
+            return ""
+        conditions = []
+        for key, value in properties.items():
+            conditions.append(f"{alias}.{key} = ${alias}_{key}")
+        return " AND ".join(conditions)
+
+    def find_node_by_relationship(self, relationship_type, front_node_name):
+        """
+        根据关系类型和属性查找节点 - 向后兼容方法
+        """
+        # 使用新的统一查询方法
+        source_condition = QueryCondition(properties={"name": front_node_name})
+        relationship_condition = QueryCondition(relationship_type=relationship_type, direction="outgoing")
+        
+        result = self.find_nodes_by_condition(source_condition, relationship_condition)
+        
+        if result['success']:
+            # 只返回目标节点（通过关系连接的节点）
+            target_nodes = []
+            for node in result['nodes']:
+                # 过滤掉源节点，只保留目标节点
+                if node.properties.get('name') != front_node_name:
+                    target_nodes.append(node)
+            return {'success': True, 'nodes': target_nodes}
+        else:
+            return result
     
     def delete_relationship(self, from_node, relationship_type, to_node):
         """
