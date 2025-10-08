@@ -7,7 +7,7 @@ chroma_utils = ChromeUtils()
 
 def extract_entity_from_question(question):
     system_prompt = """
-    你是一个具有多年问诊经验的中医医生，具有丰富的中医知识，能够根据问题，提取出问题中的实体和关系。
+    你是一个具有多年问诊经验的西医医生，具有丰富的西医知识，能够根据问题，提取出问题中的实体和关系。
     实体有可能是疾病Disease、症状Symptom、药品Drug。
     关系有可能是recommand_eat(推荐食谱)、recommand_drug(推荐药品)、has_symptom(症状)。"""
     user_prompt = f"""
