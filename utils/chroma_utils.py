@@ -24,8 +24,8 @@ class ChromeUtils:
             ids=ids
         )
 
-    def query_document(self, query,type, n_results=1):
-        return self.collection.query(query_texts=[query], n_results=n_results,where={"type": type})
+    def query_document(self, query,label, n_results=1):
+        return self.collection.query(query_texts=[query], n_results=n_results,where={"label": label})
 
 
 # # 添加中文文档

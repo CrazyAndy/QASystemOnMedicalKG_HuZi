@@ -40,7 +40,6 @@ def read_nodes(data_path):
     for data in open(data_path):
         disease_dict = {}
         count += 1
-        print(count)
         data_json = json.loads(data)
         disease = data_json['name']
         disease_dict['name'] = disease
@@ -58,7 +57,7 @@ def read_nodes(data_path):
         if 'symptom' in data_json:
             symptoms += data_json['symptom']
             for symptom in data_json['symptom']:
-                rels_symptom.append([disease, symptom])
+                rels_symptom.append([symptom,disease])
 
         if 'acompany' in data_json:
             for acompany in data_json['acompany']:
@@ -161,8 +160,6 @@ def create_node_by_label_and_nodes(label, node_names):
 
 
 '''创建知识图谱中心疾病的节点'''
-
-
 def create_diseases_nodes(disease_infos):
     nodes = []
     for disease_dict in disease_infos:
@@ -186,50 +183,28 @@ def create_diseases_nodes(disease_infos):
 '''创建实体关联边'''
 
 
-def create_relationship(start_node, end_node, edges, rel_type, rel_name):
+def create_relationship(start_node_label, end_node_label, edges, rel_type, rel_name):
     relationships = []
-    count = 0
-    # 去重处理
-    set_edges = []
     for edge in edges:
-        set_edges.append('###'.join(edge))
-    all = len(set(set_edges))
-    for edge in set(set_edges):
-        edge = edge.split('###')
-        p = edge[0]
-        q = edge[1]
-        from_node = {'label': start_node, 'properties': {'name': p}}
-        to_node = {'label': end_node, 'properties': {'name': q}}
+        from_node = {'label': start_node_label, 'properties': {'name': edge[0]}}
+        to_node = {'label': end_node_label, 'properties': {'name': edge[1]}}
         try:
-            result = graph_db_utils.create_relationship(
-                from_node, rel_type, to_node, properties={'name': rel_name})
+            result = graph_db_utils.create_relationship(from_node, rel_type, to_node, properties={'name': rel_name})
             if result['success']:
                 relationships.append(result['relationship'])
-            count += 1
-            print(rel_type, count, all)
         except Exception as e:
             print(e)
-
     return relationships
 
 
-def insert_nodes_2_chroma(nodes):
+def insert_nodes_2_chroma(nodes,label):
     for node in nodes:
         if isinstance(node, Node):
-            print(f"插入节点: {node.labels} {node.id}")
+            info(f"向chroma插入节点: {node.labels},{node.properties['name']}")
             chroma_utils.add_document(
-                node.labels,
-                {"type":"entity","topic": node.labels[0]},
+                node.properties['name'],
+                {"label":label},
                 [str(node.id)])
-
-
-def insert_relationships_2_chroma(relationships):
-    for relationship in relationships:
-        if isinstance(relationship, Relationship):
-            chroma_utils.add_document(
-                relationship.type,
-                {"type":"relationship","topic": relationship.type[0]},
-                [str(relationship.id)])
 
 
 if __name__ == "__main__":
@@ -247,62 +222,21 @@ if __name__ == "__main__":
     info(f"2、创建疾病节点 完成")
 
     # 3，创建药品、食物、检查、科室、生产商、症状节点
-    drugs_nodes = create_node_by_label_and_nodes("Drug", drugs)
-    # foods_nodes = create_node_by_label_and_nodes("Food", foods)
-    # checks_nodes = create_node_by_label_and_nodes("Check", checks)
-    # departments_nodes = create_node_by_label_and_nodes(
-    #     "Department", departments)
-    # producers_nodes = create_node_by_label_and_nodes("Producer", producers)
     symptoms_nodes = create_node_by_label_and_nodes("Symptom", symptoms)
-    info(f"3、创建药品、食物、检查、科室、生产商、症状节点 完成")
+    drugs_nodes = create_node_by_label_and_nodes("Drug", drugs)
+    info(f"3、创建症状、药品完成")
 
     # 4、创建实体关系
-    # rels_recommandeat_nodes = create_relationship('Disease', 'Food', rels_recommandeat,
-    #                                               'recommand_eat', '推荐食谱')
-    # rels_noteat_nodes = create_relationship(
-    #     'Disease', 'Food', rels_noteat, 'no_eat', '忌吃')
-    # rels_doeat_nodes = create_relationship(
-    #     'Disease', 'Food', rels_doeat, 'do_eat', '宜吃')
-    # rels_department_nodes = create_relationship('Department', 'Department',
-    #                                             rels_department, 'belongs_to', '属于')
-    # rels_commonddrug_nodes = create_relationship('Disease', 'Drug', rels_commonddrug,
-    #                                              'common_drug', '常用药品')
-    # rels_drug_producer_nodes = create_relationship('Producer', 'Drug',
-    #                                                rels_drug_producer, 'drugs_of', '生产药品')
     rels_recommanddrug_nodes = create_relationship('Disease', 'Drug', rels_recommanddrug,
                                                    'recommand_drug', '好评药品')
-    # rels_check_nodes = create_relationship(
-    #     'Disease', 'Check', rels_check, 'need_check', '诊断检查')
-    rels_symptom_nodes = create_relationship('Disease', 'Symptom',
-                                             rels_symptom, 'has_symptom', '症状')
-    # rels_acompany_nodes = create_relationship('Disease', 'Disease',
-    #                                           rels_acompany, 'acompany_with', '并发症')
-    # rels_category_nodes = create_relationship('Disease', 'Department',
-    #                                           rels_category, 'belongs_to', '所属科室')
+    rels_symptom_nodes = create_relationship('Symptom','Disease', 
+                                             rels_symptom, 'symptom_disease', '症状')
     info(f"4、创建实体关系 完成")
+    insert_nodes_2_chroma(diseases_nodes,'Disease')
+    insert_nodes_2_chroma(symptoms_nodes,'Symptom')
+    insert_nodes_2_chroma(drugs_nodes,'Drug')
 
-    insert_nodes_2_chroma(diseases_nodes)
-    insert_nodes_2_chroma(drugs_nodes)
-    # insert_nodes_2_chroma(foods_nodes)
-    # insert_nodes_2_chroma(checks_nodes)
-    # insert_nodes_2_chroma(departments_nodes)
-    # insert_nodes_2_chroma(producers_nodes)
-    insert_nodes_2_chroma(symptoms_nodes)
-    
     info(f"5、插入节点到chroma 完成")
-    
-    # insert_relationships_2_chroma(rels_recommandeat_nodes)
-    # insert_relationships_2_chroma(rels_noteat_nodes)
-    # insert_relationships_2_chroma(rels_doeat_nodes)
-    # insert_relationships_2_chroma(rels_department_nodes)
-    # insert_relationships_2_chroma(rels_commonddrug_nodes)
-    # insert_relationships_2_chroma(rels_drug_producer_nodes)
-    insert_relationships_2_chroma(rels_recommanddrug_nodes)
-    # insert_relationships_2_chroma(rels_check_nodes)
-    insert_relationships_2_chroma(rels_symptom_nodes)
-    # insert_relationships_2_chroma(rels_acompany_nodes)
-    # insert_relationships_2_chroma(rels_category_nodes)
-    info(f"6、插入关系到chroma 完成")
     
     
     

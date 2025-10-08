@@ -71,7 +71,6 @@ class Neo4jUtils:
                 record = result.single()
                 if record:
                     node = record['n']
-                    info(f"成功创建节点: {label}")
                     return {
                         'success': True,
                         'node': Node(
@@ -423,6 +422,26 @@ class Neo4jUtils:
                     
         except Exception as e:
             error(f"查找关系失败: {str(e)}")
+            return {'success': False, 'error': str(e)}
+    
+    def find_node_by_relationship(self, relationship_type, front_node_name):
+        """
+        根据关系类型和属性查找节点
+        """
+        try:
+            with self.driver.session(database=self.database) as session:
+                query = "MATCH (a)-[r:$relationship_type]->(b) WHERE a.name = $front_node_name RETURN b"
+                result = session.run(query, relationship_type=relationship_type, front_node_name=front_node_name)
+                nodes = []
+                for record in result:
+                    nodes.append(Node(
+                        id=record['b'].id,
+                        labels=list(record['b'].labels),
+                        properties=dict(record['b'])
+                    ))
+                return {'success': True, 'nodes': nodes}
+        except Exception as e:
+            error(f"查找节点失败: {str(e)}")
             return {'success': False, 'error': str(e)}
     
     def delete_relationship(self, from_node, relationship_type, to_node):

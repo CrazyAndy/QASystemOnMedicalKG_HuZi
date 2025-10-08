@@ -46,25 +46,27 @@ def extract_entity_from_question(question):
 def query_data_from_chroma(data):
     # 1, 查询疾病
     diseases = []
+    symptoms = []
+    drugs = []
     if data['Disease']:
        for disease in data['Disease']:             
-           result = chroma_utils.query_document(disease,"entity",10)
+           result = chroma_utils.query_document(disease,"Disease",1)
            diseases.extend(result['documents'][0])
        info(f"向量检索得到疾病:{diseases}")
-#     # 2, 查询症状
-#     if data['Symptom']:
-#        results = chroma_utils.query_document(data['Symptom'].join(","),len(data['Symptom']))
-#        info(f"向量检索得到症状:{results}")
-#     # 3, 查询药品
-#     if data['Drug']:
-#        results = chroma_utils.query_document(data['Drug'].join(","),len(data['Drug']))
-#        info(f"向量检索得到药品:{results}")
-#     # 4, 查询关系
-#     if data['relationship']:
-#        results = chroma_utils.query_document(data['relationship'].join(","),len(data['relationship']))
-#        info(f"向量检索得到关系:{results}")
+       
+    if data['Symptom']:
+       for symptom in data['Symptom']:             
+           result = chroma_utils.query_document(symptom,"Symptom",1)
+           symptoms.extend(result['documents'][0])
+       info(f"向量检索得到症状:{symptoms}")
+       
+    if data['Drug']:
+       for drug in data['Drug']:             
+           result = chroma_utils.query_document(drug,"Drug",1)
+           drugs.extend(result['documents'][0])
+       info(f"向量检索得到药品:{drugs}")
     
-    return diseases
+    return diseases,symptoms,drugs
 
 
 if __name__ == "__main__":
@@ -73,8 +75,8 @@ if __name__ == "__main__":
 #     info(f"提取到的实体和关系:{data}\n")
 #     query_data_from_chroma(json.loads(data))
     
-    data = {"Disease":["脱囊"],
+    data = {"Disease":["感冒"],
     "Symptom":["咳嗽","头疼","流鼻涕"],
-    "Drug":[],
-    "relationship":["has_symptom"]}
+    "Drug":["益髓颗粒"],
+    "relationship":["recommand_drug"]}
     query_data_from_chroma(data)
