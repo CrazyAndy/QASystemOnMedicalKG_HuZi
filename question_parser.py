@@ -9,7 +9,7 @@ def extract_entity_from_question(question):
     system_prompt = """
     你是一个具有多年问诊经验的西医医生，具有丰富的西医知识，能够根据问题，提取出问题中的实体和关系。
     实体有可能是疾病Disease、症状Symptom、药品Drug。
-    关系有可能是recommand_eat(推荐食谱)、recommand_drug(推荐药品)、has_symptom(症状)。"""
+    关系有可能是recommand_drug(推荐药品)、symptom_disease(症状到疾病)。"""
     user_prompt = f"""
     问题: {question}
     请根据问题，提取出问题中的实体和关系。不能包含其他内容。
@@ -25,7 +25,7 @@ def extract_entity_from_question(question):
     返回: {{"Disease":[""],
     "Symptom":["咳嗽","头疼","流鼻涕"],
     "Drug":[],
-    "relationship":["has_symptom"]}}
+    "relationship":["symptom_disease"]}}
     
     问题2: 感冒应该吃什么药，吃感冒灵胶囊可以吗?
     返回: {{"Disease":["感冒"],
