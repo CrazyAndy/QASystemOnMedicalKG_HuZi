@@ -1,3 +1,12 @@
+运行流程
+先执行 uv run python create_graph.py 
+
+---
+so many years later 
+---
+
+再执行 uv run python chatbot_graph.py
+
 西医智能辩证实施步骤 
 
 # 一、构建知识图谱
@@ -23,6 +32,9 @@
 
 # 五、让LLM进行总结(LLM)
 集合问题 和 之前的汇总信息，让大模型进行总结
+
+
+
 
 
 
